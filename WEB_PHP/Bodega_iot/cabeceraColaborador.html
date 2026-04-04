@@ -1,0 +1,53 @@
+<?php
+session_start();
+$nombreUsuario = isset($_SESSION['nombre_completo']) ? $_SESSION['nombre_completo'] : 'Vendedor';
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="CSS/estilos_admin.css"> 
+    <style>
+        /* Volvemos al VERDE Eco para mantener la identidad de marca */
+        body { margin: 0; padding: 0; background-color: #2E7D32; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        
+        .header-container { display: flex; justify-content: space-between; align-items: center; height: 70px; padding: 0 20px; color: white; }
+        
+        .logo-area { display: flex; align-items: center; gap: 10px; }
+        .logo-area img { height: 40px; }
+        
+        .logo-text h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+        /* Verde claro para subtítulos */
+        .logo-text span { font-size: 12px; color: #A5D6A7; } 
+        
+        .user-area { display: flex; align-items: center; gap: 15px; }
+        .user-info { text-align: right; }
+        .user-name { display: block; font-weight: bold; font-size: 14px; }
+        
+        /* Verde muy claro para el rol */
+        .user-role { display: block; font-size: 11px; color: #C8E6C9; } 
+        
+        .btn-logout { background-color: #c62828; color: white; text-decoration: none; padding: 5px 15px; border-radius: 4px; font-size: 12px; transition: 0.3s; }
+        .btn-logout:hover { background-color: #ff5252; }
+    </style>
+</head>
+<body>
+    <div class="header-container">
+        <div class="logo-area">
+            <img src="imagenes/logo_peso.png" alt="Logo"> 
+            <div class="logo-text">
+                <h1>Bodega_IOT</h1>
+                <span>Módulo de Ventas</span>
+            </div>
+        </div>
+
+        <div class="user-area">
+            <div class="user-info">
+                <span class="user-name">Hola, <?php echo $nombreUsuario; ?></span>
+                <span class="user-role">Rol: Colaborador</span>
+            </div>
+            <a href="logout.php" target="_top" class="btn-logout">Cerrar Sesión</a>
+        </div>
+    </div>
+</body>
+</html>

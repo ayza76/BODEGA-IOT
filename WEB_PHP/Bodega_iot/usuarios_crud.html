@@ -1,0 +1,235 @@
+<?php
+// 1. Iniciar sesión y conexión
+session_start();
+require_once "conexion.php";
+
+// Verificar acceso (Solo administradores)
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || $_SESSION["rol"] !== 'administrador') {
+    // Si intenta entrar un colaborador, lo mandamos a su dashboard o al login
+    header("location: index.php");
+    exit;
+}
+
+// Variables para el formulario
+$id_editar = "";
+$usuario = "";
+$password = "";
+$nombre_completo = "";
+$rol = "";
+$modo_edicion = false;
+$mensaje = "";
+
+// --- LÓGICA CRUD ---
+
+// A. ELIMINAR USUARIO
+if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
+    $id_eliminar = $_GET['id'];
+    
+    // Evitar que el admin se elimine a sí mismo
+    if ($id_eliminar == $_SESSION['id_usuario']) {
+        $mensaje = "❌ Error: No puedes eliminar tu propia cuenta mientras estás logueado.";
+    } else {
+        $sql = "DELETE FROM usuarios WHERE id_usuario = ?";
+        if ($stmt = mysqli_prepare($link, $sql)) {
+            mysqli_stmt_bind_param($stmt, "i", $id_eliminar);
+            if (mysqli_stmt_execute($stmt)) {
+                $mensaje = "✅ Usuario eliminado correctamente.";
+            } else {
+                $mensaje = "❌ Error al eliminar.";
+            }
+        }
+    }
+}
+
+// B. CARGAR DATOS PARA EDITAR
+if (isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET['id'])) {
+    $modo_edicion = true;
+    $id_editar = $_GET['id'];
+    $sql = "SELECT * FROM usuarios WHERE id_usuario = ?";
+    if ($stmt = mysqli_prepare($link, $sql)) {
+        mysqli_stmt_bind_param($stmt, "i", $id_editar);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        if ($row = mysqli_fetch_assoc($result)) {
+            $usuario = $row['usuario'];
+            $password = $row['password']; // Se carga la clave actual
+            $nombre_completo = $row['nombre_completo'];
+            $rol = $row['rol'];
+        }
+    }
+}
+
+// C. GUARDAR (INSERTAR O ACTUALIZAR)
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $usuario_post = trim($_POST["usuario"]);
+    $password_post = trim($_POST["password"]);
+    $nombre_post = trim($_POST["nombre_completo"]);
+    $rol_post = $_POST["rol"];
+    $id_post = $_POST["id_usuario"];
+
+    if (!empty($usuario_post) && !empty($password_post) && !empty($rol_post)) {
+        
+        if (!empty($id_post)) {
+            // --- ACTUALIZAR ---
+            $sql = "UPDATE usuarios SET usuario=?, password=?, nombre_completo=?, rol=? WHERE id_usuario=?";
+            if ($stmt = mysqli_prepare($link, $sql)) {
+                mysqli_stmt_bind_param($stmt, "ssssi", $usuario_post, $password_post, $nombre_post, $rol_post, $id_post);
+                if(mysqli_stmt_execute($stmt)){
+                    $mensaje = "✅ Usuario actualizado con éxito.";
+                    $modo_edicion = false; $usuario=""; $password=""; $nombre_completo=""; $rol="";
+                }
+            }
+        } else {
+            // --- CREAR NUEVO ---
+            // Primero verificamos que el usuario no exista ya
+            $check_sql = "SELECT id_usuario FROM usuarios WHERE usuario = ?";
+            $stmt_check = mysqli_prepare($link, $check_sql);
+            mysqli_stmt_bind_param($stmt_check, "s", $usuario_post);
+            mysqli_stmt_execute($stmt_check);
+            mysqli_stmt_store_result($stmt_check);
+            
+            if(mysqli_stmt_num_rows($stmt_check) > 0){
+                $mensaje = "⚠️ El nombre de usuario ya existe.";
+            } else {
+                $sql = "INSERT INTO usuarios (usuario, password, nombre_completo, rol) VALUES (?, ?, ?, ?)";
+                if ($stmt = mysqli_prepare($link, $sql)) {
+                    mysqli_stmt_bind_param($stmt, "ssss", $usuario_post, $password_post, $nombre_post, $rol_post);
+                    if(mysqli_stmt_execute($stmt)){
+                        $mensaje = "✅ Usuario creado con éxito.";
+                    }
+                }
+            }
+        }
+    } else {
+        $mensaje = "⚠️ Por favor complete todos los campos obligatorios.";
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Usuarios</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; padding: 20px; }
+        
+        .container { max-width: 1000px; margin: 0 auto; display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 20px; }
+        
+        h2 { color: #2E7D32; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; font-size: 18px; }
+        
+        label { display: block; font-weight: bold; color: #555; margin-bottom: 5px; font-size: 13px; }
+        input[type="text"], input[type="password"], select {
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;
+        }
+        
+        .btn { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; width: 100%; }
+        .btn-green { background-color: #2E7D32; }
+        .btn-green:hover { background-color: #1B5E20; }
+        .btn-cancel { background-color: #757575; margin-top: 10px; display: block; text-align: center; text-decoration: none; font-size: 14px;}
+
+        table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+        th { background-color: #455A64; color: white; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #ddd; }
+        
+        .badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .badge-admin { background-color: #e8f5e9; color: #2E7D32; border: 1px solid #c8e6c9; }
+        .badge-colab { background-color: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+
+        .actions a { text-decoration: none; font-size: 16px; margin-right: 10px; }
+        .alert { grid-column: 1 / -1; padding: 10px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-bottom: 10px; border: 1px solid #c3e6cb; }
+        .alert-error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+
+    <?php if(!empty($mensaje)): ?>
+        <div style="max-width:1000px; margin:0 auto 15px auto;" class="alert <?php echo strpos($mensaje, 'Error') !== false || strpos($mensaje, '⚠️') !== false ? 'alert-error' : ''; ?>">
+            <?php echo $mensaje; ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="container">
+        
+        <div class="card">
+            <h2><?php echo $modo_edicion ? '✏️ Editar Usuario' : '➕ Nuevo Usuario'; ?></h2>
+            
+            <form action="usuarios_crud.php" method="post">
+                <input type="hidden" name="id_usuario" value="<?php echo $id_editar; ?>">
+                
+                <label>Nombre Completo:</label>
+                <input type="text" name="nombre_completo" value="<?php echo $nombre_completo; ?>" required placeholder="Ej: Juan Pérez">
+
+                <label>Usuario (Login):</label>
+                <input type="text" name="usuario" value="<?php echo $usuario; ?>" required placeholder="Ej: jperez">
+
+                <label>Contraseña:</label>
+                <input type="text" name="password" value="<?php echo $password; ?>" required placeholder="Contraseña">
+
+                <label>Rol:</label>
+                <select name="rol" required>
+                    <option value="">-- Seleccionar --</option>
+                    <option value="administrador" <?php echo ($rol == 'administrador') ? 'selected' : ''; ?>>Administrador</option>
+                    <option value="colaborador" <?php echo ($rol == 'colaborador') ? 'selected' : ''; ?>>Colaborador</option>
+                </select>
+
+                <button type="submit" class="btn btn-green">
+                    <?php echo $modo_edicion ? 'Guardar Cambios' : 'Crear Usuario'; ?>
+                </button>
+                
+                <?php if($modo_edicion): ?>
+                    <a href="usuarios_crud.php" class="btn-cancel">Cancelar</a>
+                <?php endif; ?>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>👥 Lista de Usuarios</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Usuario</th>
+                        <th>Rol</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $sql_lista = "SELECT * FROM usuarios ORDER BY id_usuario ASC";
+                    if($result = mysqli_query($link, $sql_lista)){
+                        while($row = mysqli_fetch_assoc($result)){
+                            echo "<tr>";
+                            echo "<td>" . $row['id_usuario'] . "</td>";
+                            echo "<td>" . $row['nombre_completo'] . "</td>";
+                            echo "<td><strong>" . $row['usuario'] . "</strong></td>";
+                            
+                            echo "<td>";
+                            if($row['rol'] == 'administrador') {
+                                echo "<span class='badge badge-admin'>Admin</span>";
+                            } else {
+                                echo "<span class='badge badge-colab'>Colaborador</span>";
+                            }
+                            echo "</td>";
+                            
+                            echo "<td class='actions'>";
+                                echo "<a href='usuarios_crud.php?action=edit&id=". $row['id_usuario'] ."' title='Editar'>✏️</a>";
+                                // Evitar botón de borrar para uno mismo
+                                if($row['id_usuario'] != $_SESSION['id_usuario']){
+                                    echo "<a href='usuarios_crud.php?action=delete&id=". $row['id_usuario'] ."' onclick='return confirm(\"¿Eliminar a este usuario?\");' title='Eliminar' style='color:#D32F2F;'>🗑️</a>";
+                                }
+                            echo "</td>";
+                            echo "</tr>";
+                        }
+                    }
+                    ?>
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</body>
+</html>

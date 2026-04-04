@@ -1,0 +1,174 @@
+<?php
+// 1. INICIAR SESIÓN (Siempre debe ser la primera línea)
+session_start();
+
+// 2. VERIFICAR SI YA ESTÁ LOGUEADO
+if(isset($_SESSION["loggedin"]) && $_SESSION["loggedin"] === true){
+    if($_SESSION["rol"] === 'administrador'){
+        header("location: menuAdministrador.php");
+        exit;
+    } else {
+        header("location: menuColaborador.php");
+        exit;
+    }
+}
+
+// 3. CONEXIÓN A LA BASE DE DATOS
+require_once "conexion.php"; 
+
+// Inicializar variables
+$username = $password = $rol = "";
+$username_err = $password_err = $login_err = $rol_err = "";
+
+// 4. PROCESAR FORMULARIO AL ENVIAR
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+    // Validar usuario
+    if (empty(trim($_POST["usuario"]))) {
+        $username_err = "Ingrese su usuario.";
+    } else {
+        $username = trim($_POST["usuario"]);
+    }
+
+    // Validar contraseña
+    if (empty(trim($_POST["password"]))) {
+        $password_err = "Ingrese su contraseña.";
+    } else {
+        $password = trim($_POST["password"]);
+    }
+    
+    // Validar Rol
+    if (empty($_POST["rol_seleccionado"])) {
+        $rol_err = "Seleccione un rol.";
+    } else {
+        $rol = trim($_POST["rol_seleccionado"]);
+    }
+
+    // Si no hay errores de validación, consultar DB
+    if (empty($username_err) && empty($password_err) && empty($rol_err)) {
+        
+        $sql = "SELECT id_usuario, usuario, password, rol, nombre_completo FROM usuarios WHERE usuario = ? AND rol = ?";
+        
+        if ($stmt = mysqli_prepare($link, $sql)) {
+            mysqli_stmt_bind_param($stmt, "ss", $param_username, $param_rol);
+            $param_username = $username;
+            $param_rol = $rol;
+            
+            if (mysqli_stmt_execute($stmt)) {
+                mysqli_stmt_store_result($stmt);
+                
+                if (mysqli_stmt_num_rows($stmt) == 1) {                    
+                    mysqli_stmt_bind_result($stmt, $id_usuario, $username_db, $hashed_password, $rol_db, $nombre_completo_db);
+                    
+                    if (mysqli_stmt_fetch($stmt)) {
+                        if ($password === $hashed_password) {
+                            $_SESSION["loggedin"] = true;
+                            $_SESSION["id_usuario"] = $id_usuario;
+                            $_SESSION["usuario"] = $username_db;
+                            $_SESSION["rol"] = $rol_db;
+                            $_SESSION["nombre_completo"] = $nombre_completo_db; 
+                            
+                            if ($rol_db === 'administrador') {
+                                header("location: menuAdministrador.php");
+                            } else {
+                                header("location: menuColaborador.php");
+                            }
+                            exit;
+                        } else {
+                            $login_err = "La contraseña es incorrecta.";
+                        }
+                    }
+                } else {
+                    $login_err = "No existe cuenta con ese Usuario y Rol.";
+                }
+            } else {
+                echo "Ups! Algo salió mal. Por favor intente más tarde.";
+            }
+            mysqli_stmt_close($stmt);
+        }
+    }
+    mysqli_close($link);
+}
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="imagenes/icono.png">
+    <title>Login | Bodega_IOT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #e8f5e9; } /* Fondo verde muy claro */
+        /* Personalización de colores Eco-Weight */
+        .text-eco { color: #2E7D32; }
+        .bg-eco { background-color: #2E7D32; }
+        .bg-eco:hover { background-color: #1B5E20; }
+        .border-eco:focus { border-color: #2E7D32; box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.2); }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-md">
+        
+        <div class="bg-white shadow-2xl rounded-lg p-8 border-t-4 border-green-700"> <div class="text-center mb-6">
+                <div class="text-eco mb-2">
+                    <span style="font-size: 45px;">⚖️</span>
+                </div>
+                <h2 class="mt-2 text-3xl font-extrabold text-gray-900">
+                    Bodega_IOT
+                </h2>
+                <p class="mt-2 text-sm text-gray-600">
+                    Ingreso al Sistema de Control
+                </p>
+            </div>
+
+            <?php 
+            if(!empty($login_err)){
+                echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm text-center" role="alert">' . $login_err . '</div>';
+            }        
+            ?>
+
+            <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Usuario</label>
+                    <input type="text" name="usuario" 
+                           class="mt-1 block w-full px-4 py-2 border rounded-md shadow-sm focus:outline-none border-eco sm:text-sm 
+                           <?php echo (!empty($username_err)) ? 'border-red-500' : 'border-gray-300'; ?>" 
+                           value="<?php echo $username; ?>">
+                    <span class="text-red-500 text-xs"><?php echo $username_err; ?></span>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+                    <input type="password" name="password" 
+                           class="mt-1 block w-full px-4 py-2 border rounded-md shadow-sm focus:outline-none border-eco sm:text-sm 
+                           <?php echo (!empty($password_err)) ? 'border-red-500' : 'border-gray-300'; ?>">
+                    <span class="text-red-500 text-xs"><?php echo $password_err; ?></span>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700">Rol</label>
+                    <select name="rol_seleccionado" 
+                            class="mt-1 block w-full px-4 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none border-eco sm:text-sm">
+                        <option value="">-- Seleccionar --</option>
+                        <option value="administrador" <?php echo ($rol == 'administrador') ? 'selected' : ''; ?>>Administrador</option>
+                        <option value="colaborador" <?php echo ($rol == 'colaborador') ? 'selected' : ''; ?>>Colaborador</option>
+                    </select>
+                    <span class="text-red-500 text-xs"><?php echo $rol_err; ?></span>
+                </div>
+
+                <button type="submit" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-eco focus:outline-none transition duration-150">
+                    Entrar
+                </button>
+                
+            </form>
+        </div>
+        
+        <p class="mt-4 text-center text-xs text-gray-500">
+            &copy; 2025 Bodega_IOT System v1.0
+        </p>
+    </div>
+</body>
+</html>

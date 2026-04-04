@@ -1,0 +1,265 @@
+<?php
+// 1. Iniciar sesión y conexión
+session_start();
+require_once "conexion.php";
+
+// Verificar acceso
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
+    header("location: index.php");
+    exit;
+}
+
+// --- LÓGICA DE DATOS ---
+
+// A. OBTENER ÚLTIMA LECTURA (Tiempo Real)
+$temp_actual = 0;
+$hum_actual = 0;
+$fecha_actual = "Sin datos";
+$estado_clima = "Desconocido";
+
+$sql_last = "SELECT * FROM datos_sensores ORDER BY id DESC LIMIT 1";
+if ($result = mysqli_query($link, $sql_last)) {
+    if (mysqli_num_rows($result) > 0) {
+        $row = mysqli_fetch_assoc($result);
+        $temp_actual = $row['temperatura'];
+        $hum_actual = $row['humedad'];
+        $fecha_actual = date("d/m/Y H:i:s", strtotime($row['timestamp']));
+        
+        // Lógica de Estado (Semáforo)
+        if ($temp_actual > 28) {
+            $estado_clima = "🔥 ALERTA DE CALOR";
+            $color_estado = "#D32F2F"; // Rojo
+        } elseif ($hum_actual > 70) {
+            $estado_clima = "💧 ALERTA DE HUMEDAD";
+            $color_estado = "#1976D2"; // Azul
+        } else {
+            $estado_clima = "✅ AMBIENTE ÓPTIMO";
+            $color_estado = "#2E7D32"; // Verde
+        }
+    }
+}
+
+// B. OBTENER HISTORIAL PARA EL GRÁFICO (Últimos 20 registros)
+$labels = [];
+$data_temp = [];
+$data_hum = [];
+
+$sql_hist = "SELECT * FROM (
+                SELECT temperatura, humedad, timestamp 
+                FROM datos_sensores 
+                ORDER BY id DESC LIMIT 20
+             ) sub ORDER BY timestamp ASC"; // Reordenamos ASC para que el gráfico vaya de izquierda a derecha
+
+if ($result = mysqli_query($link, $sql_hist)) {
+    while($row = mysqli_fetch_assoc($result)){
+        // Guardamos solo la hora (H:i) para el gráfico
+        $labels[] = date("H:i", strtotime($row['timestamp'])); 
+        $data_temp[] = $row['temperatura'];
+        $data_hum[] = $row['humedad'];
+    }
+}
+
+// Convertir arrays PHP a JSON para usarlos en JavaScript
+$json_labels = json_encode($labels);
+$json_temp = json_encode($data_temp);
+$json_hum = json_encode($data_hum);
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Monitor de Sensores DHT11</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <meta http-equiv="refresh" content="15"> 
+    
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; padding: 20px; }
+        
+        /* Grid Principal */
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-bottom: 20px; }
+        
+        /* Paneles */
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #455A64; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 18px; }
+
+        /* Tarjetas de Sensores (Estilo circular) */
+        .sensor-display { text-align: center; padding: 20px 0; }
+        .circle-gauge {
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 10px auto;
+            border: 8px solid #eee;
+            position: relative;
+        }
+        .val { font-size: 32px; font-weight: bold; color: #333; }
+        .unit { font-size: 14px; color: #777; position: absolute; bottom: 25px; }
+        
+        /* Colores Específicos */
+        .temp-color { border-color: #FF7043; color: #E64A19; }
+        .hum-color { border-color: #42A5F5; color: #1565C0; }
+        
+        .status-box {
+            background-color: <?php echo $color_estado; ?>;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 15px;
+            animation: pulse 2s infinite;
+        }
+
+        /* Tabla de Historial */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+        th { background-color: #546E7A; color: white; padding: 8px; text-align: left; }
+        td { padding: 8px; border-bottom: 1px solid #eee; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-grid">
+        
+        <div class="panel">
+            <h2>🌡️ Lectura Actual (DHT11)</h2>
+            <p style="text-align:center; color:#777; font-size:12px;">Última sincronización: <?php echo $fecha_actual; ?></p>
+            
+            <div style="display:flex; justify-content: space-around;">
+                <div style="text-align:center;">
+                    <div class="circle-gauge temp-color">
+                        <span class="val"><?php echo $temp_actual; ?>°</span>
+                        <span class="unit">Temp</span>
+                    </div>
+                </div>
+
+                <div style="text-align:center;">
+                    <div class="circle-gauge hum-color">
+                        <span class="val"><?php echo $hum_actual; ?>%</span>
+                        <span class="unit">Hum</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-box">
+                <?php echo $estado_clima; ?>
+            </div>
+            
+            <div style="margin-top:15px; font-size:12px; color:#555; text-align: justify;">
+                <strong>Nota:</strong> Mantener la temperatura por debajo de 28°C para preservar chocolates y lácteos. La humedad alta (>70%) puede dañar empaques de cartón.
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>📈 Comportamiento en el Tiempo</h2>
+            <div style="height: 250px;">
+                <canvas id="sensorChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="panel">
+        <h2>📋 Historial de Registros Recientes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Registro</th>
+                    <th>Fecha y Hora</th>
+                    <th>Temperatura (°C)</th>
+                    <th>Humedad (%)</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                // Consultamos de nuevo para la tabla (descendente para ver lo último arriba)
+                $sql_table = "SELECT * FROM datos_sensores ORDER BY id DESC LIMIT 10";
+                if ($result = mysqli_query($link, $sql_table)) {
+                    while($row = mysqli_fetch_assoc($result)){
+                        echo "<tr>";
+                        echo "<td>#" . $row['id'] . "</td>";
+                        echo "<td>" . date("d/m/Y h:i:s A", strtotime($row['timestamp'])) . "</td>";
+                        echo "<td style='color:#E64A19; font-weight:bold;'>" . $row['temperatura'] . " °C</td>";
+                        echo "<td style='color:#1565C0; font-weight:bold;'>" . $row['humedad'] . " %</td>";
+                        
+                        echo "<td>";
+                        if($row['temperatura'] > 28) echo "<span style='color:red;'>⚠️ Calor</span>";
+                        else echo "<span style='color:green;'>Normal</span>";
+                        echo "</td>";
+                        echo "</tr>";
+                    }
+                }
+                ?>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('sensorChart').getContext('2d');
+        const sensorChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: <?php echo $json_labels; ?>, // Horas desde PHP
+                datasets: [
+                    {
+                        label: 'Temperatura (°C)',
+                        data: <?php echo $json_temp; ?>,
+                        borderColor: '#FF7043', // Naranja
+                        backgroundColor: 'rgba(255, 112, 67, 0.1)',
+                        borderWidth: 2,
+                        yAxisID: 'y',
+                        tension: 0.4, // Curvas suaves
+                        fill: true
+                    },
+                    {
+                        label: 'Humedad (%)',
+                        data: <?php echo $json_hum; ?>,
+                        borderColor: '#42A5F5', // Azul
+                        backgroundColor: 'rgba(66, 165, 245, 0.1)',
+                        borderWidth: 2,
+                        yAxisID: 'y1',
+                        tension: 0.4, // Curvas suaves
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Temperatura' },
+                        suggestedMin: 15,
+                        suggestedMax: 35
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Humedad' },
+                        grid: { drawOnChartArea: false }, // Ocultar rejilla derecha para limpiar
+                        suggestedMin: 30,
+                        suggestedMax: 90
+                    }
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>

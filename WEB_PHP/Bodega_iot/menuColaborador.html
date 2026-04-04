@@ -1,0 +1,40 @@
+<?php
+// 1. Iniciar sesión para verificar seguridad
+session_start();
+
+// 2. Seguridad: Si NO está logueado o NO es colaborador, lo sacamos
+if (!isset($_SESSION["loggedin"]) || $_SESSION["rol"] !== 'colaborador') {
+    header("location: index.php");
+    exit;
+}
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <title>Panel Colaborador | Bodega_IOT</title>
+    <meta charset="UTF-8">
+    <link rel="shortcut icon" href="imagenes/icono.png">
+</head>
+
+<frameset rows="70,*,40" frameborder="0" border="0" cellspacing="0">
+    
+    <frame src="cabeceraColaborador.php" name="cabecera" noresize scrolling="no"/>
+    
+    <frameset cols="220,*">
+        
+        <frame src="opcionesColaborador.php" name="menu" noresize/>
+        
+        <frame src="dashboard.php" name="contenidoPrincipal"/>
+        
+    </frameset>
+    
+    <frame src="pieDePagina.php" name="pie" noresize scrolling="no"/>
+
+</frameset>
+
+<noframes>
+    <body>
+        <p>Tu navegador no soporta frames. Por favor actualízalo.</p>
+    </body>
+</noframes>
+</html>

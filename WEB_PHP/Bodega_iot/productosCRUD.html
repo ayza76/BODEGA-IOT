@@ -1,0 +1,238 @@
+<?php
+// 1. Iniciar sesión y conexión
+session_start();
+require_once "conexion.php";
+
+// Verificar acceso
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
+    header("location: index.php");
+    exit;
+}
+
+// Inicializar variables para el formulario (Edición)
+$id_editar = "";
+$nombre = "";
+$precio = "";
+$peso_unidad = "";
+$stock = "";
+$modo_edicion = false;
+$mensaje = "";
+
+// --- LÓGICA DE PROCESAMIENTO (POST/GET) ---
+
+// A. ELIMINAR PRODUCTO
+if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
+    $id_eliminar = $_GET['id'];
+    $sql = "DELETE FROM productos WHERE producto_id = ?";
+    if ($stmt = mysqli_prepare($link, $sql)) {
+        mysqli_stmt_bind_param($stmt, "i", $id_eliminar);
+        if (mysqli_stmt_execute($stmt)) {
+            $mensaje = "Producto eliminado correctamente.";
+        } else {
+            $mensaje = "Error al eliminar: " . mysqli_error($link);
+        }
+        mysqli_stmt_close($stmt);
+    }
+}
+
+// B. PREPARAR EDICIÓN (Cargar datos en el formulario)
+if (isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET['id'])) {
+    $modo_edicion = true;
+    $id_editar = $_GET['id'];
+    $sql = "SELECT * FROM productos WHERE producto_id = ?";
+    if ($stmt = mysqli_prepare($link, $sql)) {
+        mysqli_stmt_bind_param($stmt, "i", $id_editar);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        if ($row = mysqli_fetch_assoc($result)) {
+            $nombre = $row['nombre'];
+            $precio = $row['precio_unitario'];
+            $peso_unidad = $row['peso_por_unidad'];
+            $stock = $row['stock_actual'];
+        }
+        mysqli_stmt_close($stmt);
+    }
+}
+
+// C. GUARDAR (INSERTAR O ACTUALIZAR)
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Recoger datos
+    $nombre_post = trim($_POST["nombre"]);
+    $precio_post = trim($_POST["precio"]);
+    $peso_post = trim($_POST["peso"]);
+    $stock_post = trim($_POST["stock"]);
+    $id_post = $_POST["id_producto"]; // Campo oculto
+
+    if (!empty($nombre_post) && is_numeric($precio_post)) {
+        
+        if (!empty($id_post)) {
+            // --- ACTUALIZAR (UPDATE) ---
+            $sql = "UPDATE productos SET nombre=?, precio_unitario=?, peso_por_unidad=?, stock_actual=? WHERE producto_id=?";
+            if ($stmt = mysqli_prepare($link, $sql)) {
+                mysqli_stmt_bind_param($stmt, "sddii", $nombre_post, $precio_post, $peso_post, $stock_post, $id_post);
+                if(mysqli_stmt_execute($stmt)){
+                    $mensaje = "Producto actualizado con éxito.";
+                    // Limpiar formulario
+                    $modo_edicion = false; $nombre=""; $precio=""; $peso_unidad=""; $stock="";
+                }
+            }
+        } else {
+            // --- CREAR NUEVO (INSERT) ---
+            $sql = "INSERT INTO productos (nombre, precio_unitario, peso_por_unidad, stock_actual) VALUES (?, ?, ?, ?)";
+            if ($stmt = mysqli_prepare($link, $sql)) {
+                mysqli_stmt_bind_param($stmt, "sddi", $nombre_post, $precio_post, $peso_post, $stock_post);
+                if(mysqli_stmt_execute($stmt)){
+                    $mensaje = "Producto registrado con éxito.";
+                }
+            }
+        }
+    } else {
+        $mensaje = "Error: Complete todos los campos correctamente.";
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Productos</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; padding: 20px; }
+        
+        /* Contenedores */
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        
+        h2 { color: #2E7D32; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        
+        /* Formulario */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-group { margin-bottom: 10px; }
+        label { display: block; font-weight: bold; color: #555; margin-bottom: 5px; font-size: 14px; }
+        input[type="text"], input[type="number"] {
+            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+        }
+        
+        /* Botones */
+        .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; text-decoration: none; display: inline-block; font-size: 14px; }
+        .btn-green { background-color: #2E7D32; }
+        .btn-green:hover { background-color: #1B5E20; }
+        .btn-blue { background-color: #1976D2; }
+        .btn-red { background-color: #D32F2F; }
+        .btn-cancel { background-color: #757575; }
+
+        /* Tabla */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th { background-color: #2E7D32; color: white; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #ddd; }
+        tr:hover { background-color: #f1f1f1; }
+        
+        /* Mensajes */
+        .alert { padding: 10px; background-color: #d4edda; color: #155724; border-radius: 4px; margin-bottom: 15px; border: 1px solid #c3e6cb; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+    <?php if(!empty($mensaje)): ?>
+        <div class="alert"><?php echo $mensaje; ?></div>
+    <?php endif; ?>
+
+    <div class="card">
+        <h2><?php echo $modo_edicion ? 'Editar Producto' : 'Registrar Nuevo Producto'; ?></h2>
+        
+        <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+            <input type="hidden" name="id_producto" value="<?php echo $id_editar; ?>">
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nombre del Producto:</label>
+                    <input type="text" name="nombre" value="<?php echo $nombre; ?>" required placeholder="Ej: Arroz Costeño">
+                </div>
+                <div class="form-group">
+                    <label>Precio Unitario (S/.):</label>
+                    <input type="number" step="0.01" name="precio" value="<?php echo $precio; ?>" required placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label>Peso Aprox. por Unidad (Gramos/ml):</label>
+                    <input type="number" step="0.01" name="peso" value="<?php echo $peso_unidad; ?>" required placeholder="Ej: 1000">
+                    <small style="color:#777">Referencia para la venta</small>
+                </div>
+                <div class="form-group">
+                    <label>Stock Actual:</label>
+                    <input type="number" name="stock" value="<?php echo $stock; ?>" required placeholder="0">
+                </div>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <button type="submit" class="btn btn-green">
+                    <?php echo $modo_edicion ? '💾 Actualizar Producto' : '➕ Agregar Producto'; ?>
+                </button>
+                
+                <?php if($modo_edicion): ?>
+                    <a href="productosCRUD.php" class="btn btn-cancel">Cancelar Edición</a>
+                <?php endif; ?>
+            </div>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Inventario Actual</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Producto</th>
+                    <th>Precio (S/.)</th>
+                    <th>Peso Ref.</th>
+                    <th>Stock</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                // Listar productos de la base de datos
+                $sql_lista = "SELECT * FROM productos ORDER BY producto_id DESC";
+                if($result = mysqli_query($link, $sql_lista)){
+                    if(mysqli_num_rows($result) > 0){
+                        while($row = mysqli_fetch_array($result)){
+                            echo "<tr>";
+                                echo "<td>" . $row['producto_id'] . "</td>";
+                                echo "<td><strong>" . $row['nombre'] . "</strong></td>";
+                                echo "<td>S/. " . $row['precio_unitario'] . "</td>";
+                                echo "<td>" . $row['peso_por_unidad'] . "</td>";
+                                
+                                // Color rojo si el stock es bajo (menor a 20)
+                                $estilo_stock = ($row['stock_actual'] <= 20) ? "color:red; font-weight:bold;" : "color:green;";
+                                echo "<td style='$estilo_stock'>" . $row['stock_actual'] . "</td>";
+                                
+                                echo "<td>";
+                                    // Botón Editar
+                                    echo "<a href='productosCRUD.php?action=edit&id=". $row['producto_id'] ."' class='btn btn-blue' style='padding:5px 10px; font-size:12px;'>✏️</a> ";
+                                    // Botón Eliminar (Con confirmación JS)
+                                    echo "<a href='productosCRUD.php?action=delete&id=". $row['producto_id'] ."' onclick='return confirm(\"¿Estás seguro de eliminar este producto?\");' class='btn btn-red' style='padding:5px 10px; font-size:12px;'>🗑️</a>";
+                                echo "</td>";
+                            echo "</tr>";
+                        }
+                    } else {
+                        echo "<tr><td colspan='6' style='text-align:center;'>No hay productos registrados.</td></tr>";
+                    }
+                }
+                ?>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+</body>
+</html>
+    </head>
+    <body>
+        <?php
+        // put your code here
+        ?>
+    </body>
+</html>

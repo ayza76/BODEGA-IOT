@@ -1,0 +1,14 @@
+<?php
+// 1. Iniciar la sesión (para saber cuál vamos a cerrar)
+session_start();
+
+// 2. Limpiar todas las variables de sesión (borrar usuario, rol, etc.)
+$_SESSION = array();
+
+// 3. Destruir la sesión completamente en el servidor
+session_destroy();
+
+// 4. Redirigir al usuario al login (index.php)
+header("location: index.php");
+exit;
+?>

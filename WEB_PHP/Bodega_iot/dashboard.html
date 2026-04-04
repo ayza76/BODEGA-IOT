@@ -1,0 +1,268 @@
+<?php
+// 1. Iniciar sesión y conexión
+session_start();
+require_once "conexion.php";
+
+// Verificar acceso
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
+    header("location: index.php");
+    exit;
+}
+
+// ==========================================================
+// 2. LÓGICA DE CONFIGURACIÓN Y ZONAS
+// ==========================================================
+
+// A. CAMBIAR ZONA ACTIVA
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['nueva_zona'])) {
+    $nueva_zona = intval($_POST['nueva_zona']);
+    $sql_update = "UPDATE configuracion_sistema SET zona_activa_id = $nueva_zona WHERE id = 1";
+    mysqli_query($link, $sql_update);
+    $sql_alter = "ALTER TABLE datos_sensores ALTER COLUMN id_zona SET DEFAULT $nueva_zona";
+    mysqli_query($link, $sql_alter);
+}
+
+// B. SELECCIÓN DE PRODUCTO PARA CÁLCULO DE STOCK (Persistente en sesión)
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['id_prod_calc'])) {
+    $_SESSION['calculadora_prod_id'] = intval($_POST['id_prod_calc']);
+}
+
+// C. OBTENER CONFIGURACIÓN ACTUAL
+$sql_config = "SELECT z.* FROM configuracion_sistema c JOIN zonas z ON c.zona_activa_id = z.id_zona WHERE c.id = 1";
+$res_config = mysqli_query($link, $sql_config);
+$zona_actual = mysqli_fetch_assoc($res_config);
+
+$nombre_zona = $zona_actual['nombre_zona'];
+$id_zona_actual = $zona_actual['id_zona'];
+$min_t = $zona_actual['temp_min'];
+$max_t = $zona_actual['temp_max'];
+$max_h = $zona_actual['hum_max'];
+
+// ==========================================================
+// 3. LÓGICA DE DATOS
+// ==========================================================
+
+// D. KPIs Ventas
+$ventas_hoy = 0;
+$sql_v = "SELECT SUM(total_venta) as t FROM ventas WHERE DATE(fecha_venta) = CURDATE()";
+if ($r = mysqli_query($link, $sql_v)) { $d = mysqli_fetch_assoc($r); $ventas_hoy = $d['t'] ? $d['t'] : 0; }
+
+$peso_hoy = 0;
+$sql_p = "SELECT SUM(d.peso_retirado) as t FROM detalles_venta d JOIN ventas v ON d.venta_id = v.venta_id WHERE DATE(v.fecha_venta) = CURDATE()";
+if ($r = mysqli_query($link, $sql_p)) { $d = mysqli_fetch_assoc($r); $peso_hoy = $d['t'] ? $d['t'] : 0; }
+
+// E. LECTURA DEL SENSOR (Peso, Temp, Hum)
+$temp_act = "--"; $hum_act = "--"; $peso_balanza = 0;
+$estado_clima = "Esperando datos...";
+$color_estado = "#999";
+
+$sql_sensor = "SELECT peso, temperatura, humedad, timestamp FROM datos_sensores 
+               WHERE id_zona = $id_zona_actual ORDER BY id DESC LIMIT 1";
+
+if ($result = mysqli_query($link, $sql_sensor)) {
+    if(mysqli_num_rows($result) > 0){
+        $row = mysqli_fetch_assoc($result);
+        $temp_act = $row['temperatura'];
+        $hum_act = $row['humedad'];
+        $peso_balanza = floatval($row['peso']); // Peso actual en la balanza
+        
+        // Alertas
+        if ($temp_act > $max_t) { $estado_clima = "🔥 ALERTA CALOR"; $color_estado = "#D32F2F"; }
+        elseif ($temp_act < $min_t) { $estado_clima = "❄️ ALERTA FRÍO"; $color_estado = "#1976D2"; }
+        elseif ($hum_act > $max_h) { $estado_clima = "💧 ALERTA HUMEDAD"; $color_estado = "#F57C00"; }
+        else { $estado_clima = "✅ ZONA SEGURA"; $color_estado = "#2E7D32"; }
+    }
+}
+
+// F. CÁLCULO DE UNIDADES (La nueva funcionalidad)
+$cant_estimada = 0;
+$nombre_prod_calc = "Ninguno seleccionado";
+$peso_unitario_ref = 0;
+
+if(isset($_SESSION['calculadora_prod_id']) && $_SESSION['calculadora_prod_id'] > 0) {
+    $id_p = $_SESSION['calculadora_prod_id'];
+    $q_prod = mysqli_query($link, "SELECT nombre, peso_por_unidad FROM productos WHERE producto_id = $id_p");
+    if($row_p = mysqli_fetch_assoc($q_prod)){
+        $nombre_prod_calc = $row_p['nombre'];
+        $peso_unitario_ref = floatval($row_p['peso_por_unidad']);
+        
+        if($peso_balanza > 0 && $peso_unitario_ref > 0){
+            // Redondeamos al entero más cercano
+            $cant_estimada = round($peso_balanza / $peso_unitario_ref);
+        }
+    }
+}
+
+// G. Alerta Stock Bajo
+$stock_bajo = 0;
+$r_stk = mysqli_query($link, "SELECT COUNT(*) as c FROM productos WHERE stock_actual <= 20");
+$d_stk = mysqli_fetch_assoc($r_stk); $stock_bajo = $d_stk['c'];
+
+// H. Gráfico
+$dias_graf = []; $monto_graf = [];
+$sql_ch = "SELECT DATE(fecha_venta) as f, SUM(total_venta) as t FROM ventas WHERE fecha_venta >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) GROUP BY DATE(fecha_venta)";
+$res_ch = mysqli_query($link, $sql_ch);
+$v_fecha = [];
+while($r = mysqli_fetch_assoc($res_ch)){ $v_fecha[$r['f']] = $r['t']; }
+$dias_ES = ['Mon'=>'Lun','Tue'=>'Mar','Wed'=>'Mié','Thu'=>'Jue','Fri'=>'Vie','Sat'=>'Sáb','Sun'=>'Dom'];
+for ($i = 6; $i >= 0; $i--) {
+    $f = date('Y-m-d', strtotime("-$i days"));
+    $d = date('D', strtotime("-$i days"));
+    $dias_graf[] = $dias_ES[$d]; 
+    $monto_graf[] = isset($v_fecha[$f]) ? $v_fecha[$f] : 0;
+}
+$json_lbl = json_encode($dias_graf);
+$json_dat = json_encode($monto_graf);
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Administrador</title>
+    <meta http-equiv="refresh" content="10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        h2 { color: #333; margin-bottom: 5px; }
+        .subtitulo { color: #777; margin-bottom: 25px; font-size: 14px; }
+
+        .kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; border-left: 5px solid #ccc; }
+        .card-info h3 { margin: 0; font-size: 28px; font-weight: bold; color: #333; }
+        .card-info p { margin: 0; color: #888; font-size: 13px; text-transform: uppercase; font-weight: 600; }
+        .card-icon { font-size: 35px; opacity: 0.8; }
+        
+        .c-ventas { border-left-color: #2E7D32; } .c-ventas .card-icon { color: #2E7D32; }
+        .c-peso { border-left-color: #1976D2; } .c-peso .card-icon { color: #1976D2; }
+        .c-temp { border-left-color: #E64A19; } .c-temp .card-icon { color: #E64A19; }
+        .c-alerta { border-left-color: #D32F2F; } .c-alerta .card-icon { color: #D32F2F; }
+
+        .content-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .panel-header { font-weight: bold; color: #555; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+
+        .sensor-box { display: flex; justify-content: space-around; text-align: center; margin-top: 10px; }
+        .sensor-val { font-size: 24px; font-weight: bold; }
+        
+        /* Formularios */
+        .mini-form { display: flex; gap: 5px; width: 100%; }
+        .mini-form select { flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px; }
+        .mini-form button { background: #2E7D32; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .mini-form button:hover { background: #1B5E20; }
+
+        /* Calculadora */
+        .calc-result { background: #E3F2FD; color: #1565C0; padding: 15px; border-radius: 8px; text-align: center; margin-top: 15px; border: 1px solid #BBDEFB; }
+        .calc-number { font-size: 36px; font-weight: bold; display: block; }
+    </style>
+</head>
+<body>
+
+    <h2>Panel de Control</h2>
+    <p class="subtitulo">Bienvenido, <?php echo isset($_SESSION['nombre_completo']) ? $_SESSION['nombre_completo'] : 'Admin'; ?>.</p>
+
+    <div class="kpi-container">
+        <div class="card c-ventas">
+            <div class="card-info"><h3>S/. <?php echo number_format($ventas_hoy, 2); ?></h3><p>Ventas Hoy</p></div>
+            <div class="card-icon">💰</div>
+        </div>
+        <div class="card c-peso">
+            <div class="card-info"><h3><?php echo number_format($peso_hoy, 2); ?> g</h3><p>Salida Stock</p></div>
+            <div class="card-icon">⚖️</div>
+        </div>
+        <div class="card c-temp">
+            <div class="card-info"><h3><?php echo $temp_act; ?>°C</h3><p title="<?php echo $nombre_zona; ?>">Ambiente</p></div>
+            <div class="card-icon">🌡️</div>
+        </div>
+        <div class="card c-alerta">
+            <div class="card-info"><h3><?php echo $stock_bajo; ?></h3><p>Stock Bajo</p></div>
+            <div class="card-icon">⚠️</div>
+        </div>
+    </div>
+
+    <div class="content-grid">
+        
+        <div>
+            <div class="panel">
+                <div class="panel-header">Actividad Comercial</div>
+                <canvas id="graficoVentas" height="140"></canvas>
+            </div>
+        </div>
+
+        <div>
+            
+            <div class="panel">
+                <div class="panel-header">Monitor de Zona</div>
+                
+                <form method="POST" action="dashboard.php" class="mini-form">
+                    <select name="nueva_zona">
+                        <?php
+                        $q_z = mysqli_query($link, "SELECT * FROM zonas");
+                        while($z = mysqli_fetch_assoc($q_z)){
+                            $sel = ($z['id_zona'] == $id_zona_actual) ? 'selected' : '';
+                            echo "<option value='".$z['id_zona']."' $sel>".$z['nombre_zona']."</option>";
+                        }
+                        ?>
+                    </select>
+                    <button type="submit">Cambiar</button>
+                </form>
+
+                <div class="sensor-box">
+                    <div><span style="font-size:30px;">🌡️</span><div class="sensor-val" style="color:#E64A19"><?php echo $temp_act; ?>°</div></div>
+                    <div style="border-left:1px solid #ddd;"></div>
+                    <div><span style="font-size:30px;">💧</span><div class="sensor-val" style="color:#1976D2"><?php echo $hum_act; ?>%</div></div>
+                </div>
+                <div style="text-align:center; font-weight:bold; background:<?php echo $color_estado; ?>; color:white; padding:5px; border-radius:4px; margin-top:10px; font-size:12px;">
+                    <?php echo $estado_clima; ?>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">⚖️ Calculadora de Stock</div>
+                
+                <form method="POST" action="dashboard.php" class="mini-form">
+                    <select name="id_prod_calc">
+                        <option value="">-- Seleccionar Producto --</option>
+                        <?php
+                        // Mostramos producto y su peso unitario para referencia
+                        $q_p = mysqli_query($link, "SELECT producto_id, nombre, peso_por_unidad FROM productos ORDER BY nombre");
+                        while($p = mysqli_fetch_assoc($q_p)){
+                            $sel_p = (isset($_SESSION['calculadora_prod_id']) && $_SESSION['calculadora_prod_id'] == $p['producto_id']) ? 'selected' : '';
+                            echo "<option value='".$p['producto_id']."' $sel_p>".$p['nombre']." (".$p['peso_por_unidad']."g)</option>";
+                        }
+                        ?>
+                    </select>
+                    <button type="submit">Calcular</button>
+                </form>
+
+                <div class="calc-result">
+                    <span style="font-size:12px; color:#555;">Peso en Balanza: <strong><?php echo $peso_balanza; ?> g</strong></span>
+                    <br>
+                    <span class="calc-number"><?php echo $cant_estimada; ?></span>
+                    <span style="font-size:12px; text-transform:uppercase;">Unidades Aprox.</span>
+                </div>
+                
+                <div style="font-size:11px; color:#999; text-align:center; margin-top:5px;">
+                    Producto: <?php echo $nombre_prod_calc; ?>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('graficoVentas').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: <?php echo $json_lbl; ?>,
+                datasets: [{
+                    label: 'Ventas (S/.)', data: <?php echo $json_dat; ?>,
+                    backgroundColor: 'rgba(46, 125, 50, 0.6)', borderColor: 'rgba(46, 125, 50, 1)', borderWidth: 1
+                }]
+            },
+            options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        });
+    </script>
+</body>
+</html>

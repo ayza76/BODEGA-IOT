@@ -1,0 +1,259 @@
+<?php
+session_start();
+require_once "conexion.php";
+
+// Verificar acceso
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
+    header("location: index.php");
+    exit;
+}
+
+// Inicializar carrito
+if (!isset($_SESSION['carrito'])) {
+    $_SESSION['carrito'] = array();
+}
+
+$mensaje = "";
+
+// --- LÓGICA DEL CARRITO ---
+
+// 1. AGREGAR
+if (isset($_POST['accion']) && $_POST['accion'] == 'agregar') {
+    $id_prod = $_POST['id_producto'];
+    $cantidad = intval($_POST['cantidad']);
+
+    $sql = "SELECT * FROM productos WHERE producto_id = ?";
+    if ($stmt = mysqli_prepare($link, $sql)) {
+        mysqli_stmt_bind_param($stmt, "i", $id_prod);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        $producto = mysqli_fetch_assoc($result);
+
+        if ($producto) {
+            if ($producto['stock_actual'] >= $cantidad) {
+                $subtotal = $cantidad * $producto['precio_unitario'];
+                $peso_total_linea = $cantidad * $producto['peso_por_unidad'];
+
+                $item = array(
+                    'id' => $producto['producto_id'],
+                    'nombre' => $producto['nombre'],
+                    'precio' => $producto['precio_unitario'],
+                    'cantidad' => $cantidad,
+                    'peso_unitario' => $producto['peso_por_unidad'],
+                    'peso_total' => $peso_total_linea,
+                    'subtotal' => $subtotal
+                );
+                array_push($_SESSION['carrito'], $item);
+            } else {
+                $mensaje = "❌ Stock insuficiente. Solo quedan " . $producto['stock_actual'];
+            }
+        }
+    }
+}
+
+// 2. ELIMINAR ITEM
+if (isset($_GET['eliminar'])) {
+    $indice = $_GET['eliminar'];
+    if (isset($_SESSION['carrito'][$indice])) {
+        unset($_SESSION['carrito'][$indice]);
+        $_SESSION['carrito'] = array_values($_SESSION['carrito']);
+    }
+}
+
+// 3. LIMPIAR TODO
+if (isset($_GET['limpiar'])) {
+    $_SESSION['carrito'] = array();
+}
+
+// 4. FINALIZAR VENTA (Sin alerta)
+if (isset($_POST['accion']) && $_POST['accion'] == 'finalizar' && !empty($_SESSION['carrito'])) {
+    
+    $total_venta = 0;
+    foreach ($_SESSION['carrito'] as $prod) {
+        $total_venta += $prod['subtotal'];
+    }
+    
+    $id_usuario = $_SESSION['id_usuario'];
+    $sql_venta = "INSERT INTO ventas (usuario_id, total_venta) VALUES (?, ?)";
+    
+    if ($stmt = mysqli_prepare($link, $sql_venta)) {
+        mysqli_stmt_bind_param($stmt, "id", $id_usuario, $total_venta);
+        if (mysqli_stmt_execute($stmt)) {
+            $id_nueva_venta = mysqli_insert_id($link);
+
+            foreach ($_SESSION['carrito'] as $prod) {
+                // Insertar Detalle
+                $sql_detalle = "INSERT INTO detalles_venta (venta_id, producto_id, peso_retirado, costo_linea) VALUES (?, ?, ?, ?)";
+                $stmt_det = mysqli_prepare($link, $sql_detalle);
+                mysqli_stmt_bind_param($stmt_det, "iidd", $id_nueva_venta, $prod['id'], $prod['peso_total'], $prod['subtotal']);
+                mysqli_stmt_execute($stmt_det);
+
+                // Restar Stock
+                $sql_stock = "UPDATE productos SET stock_actual = stock_actual - ? WHERE producto_id = ?";
+                $stmt_stock = mysqli_prepare($link, $sql_stock);
+                mysqli_stmt_bind_param($stmt_stock, "ii", $prod['cantidad'], $prod['id']);
+                mysqli_stmt_execute($stmt_stock);
+            }
+
+            $mensaje = "✅ Venta registrada correctamente. Ticket #" . $id_nueva_venta;
+            $_SESSION['carrito'] = array();
+        } else {
+            $mensaje = "❌ Error al registrar la venta.";
+        }
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Punto de Venta</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; padding: 20px; }
+        
+        .grid-container { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h2 { color: #2E7D32; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
+        select, input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        .btn-add { background-color: #1976D2; color: white; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .btn-add:hover { background-color: #1565C0; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background-color: #455A64; color: white; padding: 10px; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        
+        .total-row { font-size: 20px; font-weight: bold; text-align: right; background-color: #e8f5e9; color: #2E7D32; }
+        
+        /* Botón de finalizar sin alertas */
+        .btn-finish { background-color: #2E7D32; color: white; border: none; padding: 15px; width: 100%; border-radius: 4px; cursor: pointer; font-size: 18px; margin-top: 20px; font-weight: bold; transition: background-color 0.3s;}
+        .btn-finish:hover { background-color: #1B5E20; }
+        
+        .btn-delete { color: #D32F2F; text-decoration: none; font-weight: bold; font-size: 18px; }
+        
+        .alert { padding: 10px; background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; border-radius: 4px; margin-bottom: 15px; }
+        .success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
+    </style>
+</head>
+<body>
+
+    <?php if(!empty($mensaje)): ?>
+        <div class="alert <?php echo strpos($mensaje, '✅') !== false ? 'success' : ''; ?>">
+            <?php echo $mensaje; ?>
+        </div>
+    <?php endif; ?>
+
+    <div class="grid-container">
+        
+        <div class="panel">
+            <h2>🛒 Agregar Producto</h2>
+            <form method="POST" action="registrar_venta.php">
+                <input type="hidden" name="accion" value="agregar">
+                
+                <div class="form-group">
+                    <label>Producto:</label>
+                    <select name="id_producto" required id="selectProducto" onchange="actualizarPrecio()">
+                        <option value="">-- Seleccione --</option>
+                        <?php
+                        $sql = "SELECT * FROM productos WHERE stock_actual > 0 ORDER BY nombre";
+                        $result = mysqli_query($link, $sql);
+                        while($row = mysqli_fetch_assoc($result)) {
+                            echo "<option value='".$row['producto_id']."' data-precio='".$row['precio_unitario']."'>" 
+                                 . $row['nombre'] . " (Stock: ".$row['stock_actual'].") - S/. ".$row['precio_unitario'] 
+                                 . "</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Cantidad:</label>
+                    <input type="number" name="cantidad" value="1" min="1" required>
+                </div>
+
+                <div style="margin-bottom:15px; font-weight:bold; color:#555;">
+                    Precio Unitario: <span id="precioVista">S/. 0.00</span>
+                </div>
+
+                <button type="submit" class="btn-add">⬇️ Agregar a la Lista</button>
+            </form>
+        </div>
+
+        <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>📋 Detalle de Venta</h2>
+                <?php if(!empty($_SESSION['carrito'])): ?>
+                    <a href="registrar_venta.php?limpiar=true" style="color:#D32F2F; font-size:12px;">Vaciar Todo</a>
+                <?php endif; ?>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cant.</th>
+                        <th>P. Unit</th>
+                        <th>Subtotal</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $total_general = 0;
+                    if(!empty($_SESSION['carrito'])): 
+                        foreach($_SESSION['carrito'] as $indice => $item): 
+                            $total_general += $item['subtotal'];
+                    ?>
+                        <tr>
+                            <td><?php echo $item['nombre']; ?></td>
+                            <td><?php echo $item['cantidad']; ?></td>
+                            <td>S/. <?php echo number_format($item['precio'], 2); ?></td>
+                            <td>S/. <?php echo number_format($item['subtotal'], 2); ?></td>
+                            <td style="text-align:center;">
+                                <a href="registrar_venta.php?eliminar=<?php echo $indice; ?>" class="btn-delete">×</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; else: ?>
+                        <tr><td colspan="5" style="text-align:center; padding:20px; color:#999;">El carrito está vacío</td></tr>
+                    <?php endif; ?>
+                </tbody>
+                <?php if($total_general > 0): ?>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="total-row">TOTAL A PAGAR:</td>
+                            <td colspan="2" class="total-row">S/. <?php echo number_format($total_general, 2); ?></td>
+                        </tr>
+                    </tfoot>
+                <?php endif; ?>
+            </table>
+
+            <?php if(!empty($_SESSION['carrito'])): ?>
+                <form method="POST" action="registrar_venta.php">
+                    <input type="hidden" name="accion" value="finalizar">
+                    <button type="submit" class="btn-finish">
+                        ✅ Finalizar Venta
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <script>
+        function actualizarPrecio() {
+            var select = document.getElementById('selectProducto');
+            var option = select.options[select.selectedIndex];
+            var precio = option.getAttribute('data-precio');
+            if(precio) {
+                document.getElementById('precioVista').innerText = "S/. " + parseFloat(precio).toFixed(2);
+            } else {
+                document.getElementById('precioVista').innerText = "S/. 0.00";
+            }
+        }
+    </script>
+</body>
+</html>
