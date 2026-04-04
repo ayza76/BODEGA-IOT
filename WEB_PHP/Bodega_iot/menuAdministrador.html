@@ -1,23 +1,47 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <title>Panel Administrador | Bodega_IOT</title>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Administrador | Bodega_IOT</title>
     <link rel="shortcut icon" href="imagenes/icono.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estructura para que el layout ocupe toda la pantalla */
+        body, html { height: 100%; margin: 0; overflow: hidden; }
+        .app-container {
+            display: grid;
+            grid-template-rows: 70px 1fr 40px; /* Cabecera, Cuerpo, Pie */
+            height: 100vh;
+        }
+        .main-body {
+            display: grid;
+            grid-template-cols: 240px 1fr; /* Menú lateral y Contenido */
+            overflow: hidden;
+        }
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
 </head>
-<frameset rows="70,*,40" frameborder="0" border="0" cellspacing="0">
-    
-    <frame src="cabeceraAdministrador.php" name="cabecera" noresize scrolling="no"/>
-    
-    <frameset cols="220,*">
-        <frame src="opcionesAdministrador.php" name="menu" noresize/>
-        <frame src="dashboard.php" name="contenidoPrincipal"/>
-    </frameset>
-    
-    <frame src="pieDePagina.php" name="pie" noresize scrolling="no"/>
+<body>
 
-</frameset>
-<noframes>
-    <body>Tu navegador no soporta frames.</body>
-</noframes>
+    <div class="app-container">
+        <header>
+            <iframe src="cabeceraAdministrador.html" name="cabecera"></iframe>
+        </header>
+
+        <main class="main-body">
+            <aside class="border-r border-gray-200">
+                <iframe src="opcionesAdministrador.html" name="menu"></iframe>
+            </aside>
+            <section class="bg-gray-50">
+                <iframe src="dashboard.html" name="contenidoPrincipal"></iframe>
+            </section>
+        </main>
+
+        <footer class="bg-white border-t border-gray-200">
+            <iframe src="pieDePagina.html" name="pie"></iframe>
+        </footer>
+    </div>
+
+</body>
 </html>

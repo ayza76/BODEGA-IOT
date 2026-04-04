@@ -1,53 +1,61 @@
-<?php
-session_start();
-$nombreUsuario = isset($_SESSION['nombre_completo']) ? $_SESSION['nombre_completo'] : 'Vendedor';
-?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <link rel="stylesheet" href="CSS/estilos_admin.css"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="imagenes/icono.png">
+    <title>Ventas Header | Bodega_IOT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Volvemos al VERDE Eco para mantener la identidad de marca */
-        body { margin: 0; padding: 0; background-color: #2E7D32; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        
-        .header-container { display: flex; justify-content: space-between; align-items: center; height: 70px; padding: 0 20px; color: white; }
-        
-        .logo-area { display: flex; align-items: center; gap: 10px; }
-        .logo-area img { height: 40px; }
-        
-        .logo-text h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
-        /* Verde claro para subtítulos */
-        .logo-text span { font-size: 12px; color: #A5D6A7; } 
-        
-        .user-area { display: flex; align-items: center; gap: 15px; }
-        .user-info { text-align: right; }
-        .user-name { display: block; font-weight: bold; font-size: 14px; }
-        
-        /* Verde muy claro para el rol */
-        .user-role { display: block; font-size: 11px; color: #C8E6C9; } 
-        
-        .btn-logout { background-color: #c62828; color: white; text-decoration: none; padding: 5px 15px; border-radius: 4px; font-size: 12px; transition: 0.3s; }
-        .btn-logout:hover { background-color: #ff5252; }
+        body { 
+            margin: 0; 
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #2E7D32; /* Tu verde Eco-Weight original */
+        }
+        .glass-header {
+            background: rgba(46, 125, 50, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
     </style>
 </head>
 <body>
-    <div class="header-container">
-        <div class="logo-area">
-            <img src="imagenes/logo_peso.png" alt="Logo"> 
-            <div class="logo-text">
-                <h1>Bodega_IOT</h1>
-                <span>Módulo de Ventas</span>
+    <header class="glass-header sticky top-0 z-50 px-6 py-3 shadow-xl">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            
+            <div class="flex items-center gap-4 group">
+                <div class="bg-white/10 p-2 rounded-lg transition-all duration-300 group-hover:bg-white/20">
+                    <img src="imagenes/logo_peso.png" alt="Logo" class="h-10 w-auto">
+                </div>
+                <div>
+                    <h1 class="text-white font-extrabold text-lg leading-tight tracking-wide uppercase">
+                        Bodega <span class="text-green-300">IOT</span>
+                    </h1>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                        <p class="text-green-100 text-[10px] uppercase tracking-widest font-bold">Módulo de Ventas</p>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="user-area">
-            <div class="user-info">
-                <span class="user-name">Hola, <?php echo $nombreUsuario; ?></span>
-                <span class="user-role">Rol: Colaborador</span>
+            <div class="flex items-center gap-5">
+                <div class="hidden sm:flex flex-col text-right">
+                    <span class="text-white font-semibold text-sm">Hola, Jose Gerson</span>
+                    <span class="text-green-200 text-[9px] font-bold uppercase tracking-widest mt-0.5 opacity-80">
+                        Rol: Colaborador
+                    </span>
+                </div>
+
+                <a href="index.html" target="_top" 
+                   class="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-[11px] font-bold transition-all duration-300 shadow-lg shadow-red-900/30 active:scale-95">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    SALIR
+                </a>
             </div>
-            <a href="logout.php" target="_top" class="btn-logout">Cerrar Sesión</a>
         </div>
-    </div>
+    </header>
 </body>
 </html>

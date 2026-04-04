@@ -1,40 +1,52 @@
-<?php
-// 1. Iniciar sesión para verificar seguridad
-session_start();
-
-// 2. Seguridad: Si NO está logueado o NO es colaborador, lo sacamos
-if (!isset($_SESSION["loggedin"]) || $_SESSION["rol"] !== 'colaborador') {
-    header("location: index.php");
-    exit;
-}
-?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <title>Panel Colaborador | Bodega_IOT</title>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Colaborador | Bodega_IOT</title>
     <link rel="shortcut icon" href="imagenes/icono.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Seteamos el alto total y quitamos el scroll del body */
+        body, html { height: 100%; margin: 0; overflow: hidden; background-color: #f1f5f9; }
+        
+        .app-layout {
+            display: grid;
+            grid-template-rows: 70px 1fr 40px; /* Header, Cuerpo, Footer */
+            height: 100vh;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-cols: 240px 1fr; /* Menú lateral (240px) y Contenido */
+            overflow: hidden;
+        }
+
+        /* Quitamos bordes de los iframes para que parezca una sola app */
+        iframe { width: 100%; height: 100%; border: none; }
+    </style>
 </head>
+<body>
 
-<frameset rows="70,*,40" frameborder="0" border="0" cellspacing="0">
-    
-    <frame src="cabeceraColaborador.php" name="cabecera" noresize scrolling="no"/>
-    
-    <frameset cols="220,*">
-        
-        <frame src="opcionesColaborador.php" name="menu" noresize/>
-        
-        <frame src="dashboard.php" name="contenidoPrincipal"/>
-        
-    </frameset>
-    
-    <frame src="pieDePagina.php" name="pie" noresize scrolling="no"/>
+    <div class="app-layout">
+        <header class="shadow-md z-10">
+            <iframe src="cabeceraColaborador.html" name="cabecera"></iframe>
+        </header>
 
-</frameset>
+        <main class="main-content">
+            <aside class="bg-white border-r border-gray-200 shadow-sm">
+                <iframe src="opcionesColaborador.html" name="menu"></iframe>
+            </aside>
 
-<noframes>
-    <body>
-        <p>Tu navegador no soporta frames. Por favor actualízalo.</p>
-    </body>
-</noframes>
+            <section class="bg-gray-50">
+                <iframe src="dashboard.html" name="contenidoPrincipal"></iframe>
+            </section>
+        </main>
+
+        <footer class="bg-white border-t border-gray-200">
+            <iframe src="pieDePagina.html" name="pie"></iframe>
+        </footer>
+    </div>
+
+</body>
 </html>
