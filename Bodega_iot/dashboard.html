@@ -1,13 +1,9 @@
-<?php
-// ... (Mantenemos TODA tu lógica de PHP inicial exactamente igual hasta el <html>) ...
-?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Bodega_IOT</title>
-    <meta http-equiv="refresh" content="10">
+    <title>Dashboard (Demo) | Bodega_IOT</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -19,16 +15,16 @@
 <body class="p-4 md:p-8">
 
     <div class="mb-8">
-        <h2 class="text-3xl font-extrabold text-gray-800">Panel de Control</h2>
-        <p class="text-gray-500 font-medium italic">Bienvenido, <?php echo isset($_SESSION['nombre_completo']) ? $_SESSION['nombre_completo'] : 'Admin'; ?>. Revisando zona: <span class="text-green-600 font-bold"><?php echo $nombre_zona; ?></span></p>
+        <h2 class="text-3xl font-extrabold text-gray-800 tracking-tight">Panel de Control</h2>
+        <p class="text-gray-500 font-medium italic">Bienvenido, <span class="font-bold text-gray-700">Administrador</span>. Revisando zona: <span class="text-green-600 font-bold tracking-widest uppercase text-xs">Zona de Despacho A1</span></p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div class="glass-panel p-6 rounded-2xl shadow-sm border-l-4 border-green-500">
             <div class="flex justify-between items-start">
                 <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ventas Hoy</p>
-                    <h3 class="text-2xl font-extrabold text-gray-800">S/. <?php echo number_format($ventas_hoy, 2); ?></h3>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ventas Hoy</p>
+                    <h3 class="text-2xl font-black text-gray-800">S/. 450.50</h3>
                 </div>
                 <span class="text-3xl">💰</span>
             </div>
@@ -37,8 +33,8 @@
         <div class="glass-panel p-6 rounded-2xl shadow-sm border-l-4 border-blue-500">
             <div class="flex justify-between items-start">
                 <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Salida Stock</p>
-                    <h3 class="text-2xl font-extrabold text-gray-800"><?php echo number_format($peso_hoy, 2); ?> <span class="text-sm font-medium">g</span></h3>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Salida Stock</p>
+                    <h3 class="text-2xl font-black text-gray-800">8,420 <span class="text-sm font-medium">g</span></h3>
                 </div>
                 <span class="text-3xl">⚖️</span>
             </div>
@@ -47,8 +43,8 @@
         <div class="glass-panel p-6 rounded-2xl shadow-sm border-l-4 border-orange-500">
             <div class="flex justify-between items-start">
                 <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ambiente</p>
-                    <h3 class="text-2xl font-extrabold text-gray-800"><?php echo $temp_act; ?>°C</h3>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ambiente</p>
+                    <h3 class="text-2xl font-black text-gray-800">24.5°C</h3>
                 </div>
                 <span class="text-3xl">🌡️</span>
             </div>
@@ -57,8 +53,8 @@
         <div class="glass-panel p-6 rounded-2xl shadow-sm border-l-4 border-red-500">
             <div class="flex justify-between items-start">
                 <div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Stock Bajo</p>
-                    <h3 class="text-2xl font-extrabold text-gray-800"><?php echo $stock_bajo; ?> <span class="text-sm font-medium">items</span></h3>
+                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Stock Bajo</p>
+                    <h3 class="text-2xl font-black text-gray-800">5 <span class="text-sm font-medium">items</span></h3>
                 </div>
                 <span class="text-3xl">⚠️</span>
             </div>
@@ -69,7 +65,7 @@
         
         <div class="lg:col-span-2 glass-panel p-8 rounded-3xl shadow-sm">
             <div class="flex justify-between items-center mb-6">
-                <h4 class="font-bold text-gray-700 uppercase text-sm tracking-tighter italic">Actividad Comercial (Últimos 7 días)</h4>
+                <h4 class="font-bold text-gray-700 uppercase text-[10px] tracking-widest italic">Actividad Comercial (Últimos 7 días)</h4>
                 <div class="h-2 w-12 bg-green-200 rounded-full"></div>
             </div>
             <canvas id="graficoVentas" height="150"></canvas>
@@ -78,59 +74,47 @@
         <div class="space-y-8">
             
             <div class="glass-panel p-6 rounded-3xl shadow-sm border-t-4 border-green-700">
-                <h4 class="font-bold text-gray-700 text-sm mb-4">MONITOR DE ZONA</h4>
+                <h4 class="font-bold text-gray-700 text-[10px] tracking-widest uppercase mb-4">MONITOR DE ZONA</h4>
                 
-                <form method="POST" action="dashboard.php" class="flex gap-2 mb-6">
-                    <select name="nueva_zona" class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none">
-                        <?php
-                        $q_z = mysqli_query($link, "SELECT * FROM zonas");
-                        while($z = mysqli_fetch_assoc($q_z)){
-                            $sel = ($z['id_zona'] == $id_zona_actual) ? 'selected' : '';
-                            echo "<option value='".$z['id_zona']."' $sel>".$z['nombre_zona']."</option>";
-                        }
-                        ?>
+                <div class="flex gap-2 mb-6">
+                    <select class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none cursor-not-allowed">
+                        <option>Zona de Despacho A1</option>
                     </select>
-                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all">OK</button>
-                </form>
+                    <button class="bg-green-600 text-white px-4 py-2 rounded-xl text-[10px] font-black">OK</button>
+                </div>
 
                 <div class="grid grid-cols-2 gap-4 text-center">
                     <div class="bg-orange-50 p-4 rounded-2xl">
-                        <span class="text-xs font-bold text-orange-600 block mb-1">TEMP</span>
-                        <span class="text-2xl font-black text-orange-700"><?php echo $temp_act; ?>°</span>
+                        <span class="text-[10px] font-black text-orange-600 block mb-1 uppercase">TEMP</span>
+                        <span class="text-2xl font-black text-orange-700">24.5°</span>
                     </div>
                     <div class="bg-blue-50 p-4 rounded-2xl">
-                        <span class="text-xs font-bold text-blue-600 block mb-1">HUM</span>
-                        <span class="text-2xl font-black text-blue-700"><?php echo $hum_act; ?>%</span>
+                        <span class="text-[10px] font-black text-blue-600 block mb-1 uppercase">HUM</span>
+                        <span class="text-2xl font-black text-blue-700">62%</span>
                     </div>
                 </div>
-                <div class="mt-4 text-center font-bold text-[10px] uppercase tracking-widest py-2 rounded-lg" style="background:<?php echo $color_estado; ?>; color:white;">
-                    <?php echo $estado_clima; ?>
+                <div class="mt-4 text-center font-black text-[9px] uppercase tracking-[2px] py-2 rounded-lg bg-[#2E7D32] text-white">
+                    ✅ AMBIENTE ÓPTIMO
                 </div>
             </div>
 
             <div class="glass-panel p-6 rounded-3xl shadow-sm border-t-4 border-blue-700">
-                <h4 class="font-bold text-gray-700 text-sm mb-4 tracking-tighter italic">⚖️ ESTIMACIÓN DE UNIDADES</h4>
+                <h4 class="font-bold text-gray-700 text-[10px] tracking-widest uppercase mb-4 italic">⚖️ ESTIMACIÓN DE UNIDADES</h4>
                 
-                <form method="POST" action="dashboard.php" class="flex flex-col gap-3 mb-6">
-                    <select name="id_prod_calc" class="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-xs focus:ring-2 focus:ring-blue-500 outline-none">
-                        <option value="">-- Seleccionar Producto --</option>
-                        <?php
-                        $q_p = mysqli_query($link, "SELECT producto_id, nombre, peso_por_unidad FROM productos ORDER BY nombre");
-                        while($p = mysqli_fetch_assoc($q_p)){
-                            $sel_p = (isset($_SESSION['calculadora_prod_id']) && $_SESSION['calculadora_prod_id'] == $p['producto_id']) ? 'selected' : '';
-                            echo "<option value='".$p['producto_id']."' $sel_p>".$p['nombre']." (".$p['peso_por_unidad']."g)</option>";
-                        }
-                        ?>
+                <div class="flex flex-col gap-3 mb-6">
+                    <select class="bg-gray-50 border border-gray-200 rounded-xl px-3 py-3 text-[10px] font-bold outline-none cursor-pointer">
+                        <option>Arroz Costeño (1000g)</option>
+                        <option>Aceite Primor (900g)</option>
                     </select>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-xs font-bold shadow-lg shadow-blue-100 transition-all">Calcular Unidades</button>
-                </form>
+                    <button class="bg-blue-600 text-white py-3 rounded-xl text-[10px] font-black shadow-lg shadow-blue-100">CALCULAR UNIDADES</button>
+                </div>
 
                 <div class="bg-blue-600 p-6 rounded-2xl text-center text-white shadow-inner">
-                    <p class="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-1">Peso en Balanza: <?php echo $peso_balanza; ?>g</p>
-                    <span class="text-5xl font-black block"><?php echo $cant_estimada; ?></span>
-                    <p class="text-[10px] font-bold uppercase mt-1">unidades aproximadas</p>
+                    <p class="text-[9px] font-black uppercase tracking-widest opacity-80 mb-1">Peso en Balanza: 8420g</p>
+                    <span class="text-5xl font-black block">8</span>
+                    <p class="text-[9px] font-black uppercase mt-1 tracking-wider">unidades aproximadas</p>
                 </div>
-                <p class="mt-3 text-center text-[10px] font-bold text-gray-400 italic"><?php echo $nombre_prod_calc; ?></p>
+                <p class="mt-3 text-center text-[9px] font-bold text-gray-400 italic">Arroz Costeño 1kg</p>
             </div>
 
         </div>
@@ -141,10 +125,10 @@
         new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: <?php echo $json_lbl; ?>,
+                labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
                 datasets: [{
                     label: 'Ventas (S/.)',
-                    data: <?php echo $json_dat; ?>,
+                    data: [120, 210, 180, 450, 320, 580, 450],
                     backgroundColor: 'rgba(34, 197, 94, 0.5)',
                     borderColor: 'rgb(34, 197, 94)',
                     borderWidth: 2,
@@ -155,8 +139,8 @@
                 responsive: true,
                 plugins: { legend: { display: false } },
                 scales: { 
-                    y: { beginAtZero: true, grid: { display: false } },
-                    x: { grid: { display: false } }
+                    y: { beginAtZero: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+                    x: { grid: { display: false }, ticks: { font: { size: 10 } } }
                 }
             }
         });
