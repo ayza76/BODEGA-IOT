@@ -6,47 +6,33 @@
     <title>Panel Colaborador | Bodega_IOT</title>
     <link rel="shortcut icon" href="imagenes/icono.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Seteamos el alto total y quitamos el scroll del body */
-        body, html { height: 100%; margin: 0; overflow: hidden; background-color: #f1f5f9; }
-        
-        .app-layout {
-            display: grid;
-            grid-template-rows: 70px 1fr 40px; /* Header, Cuerpo, Footer */
-            height: 100vh;
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-cols: 240px 1fr; /* Menú lateral (240px) y Contenido */
-            overflow: hidden;
-        }
-
-        /* Quitamos bordes de los iframes para que parezca una sola app */
-        iframe { width: 100%; height: 100%; border: none; }
+        /* Aseguramos que la pantalla no tenga scroll externo */
+        body, html { height: 100vh; overflow: hidden; margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; }
     </style>
 </head>
-<body>
+<body class="flex flex-col h-screen w-full">
 
-    <div class="app-layout">
-        <header class="shadow-md z-10">
-            <iframe src="cabeceraColaborador.html" name="cabecera"></iframe>
-        </header>
+    <header class="h-[70px] w-full bg-white shadow-md z-20">
+        <iframe src="cabeceraColaborador.html" name="cabecera" class="w-full h-full border-none"></iframe>
+    </header>
 
-        <main class="main-content">
-            <aside class="bg-white border-r border-gray-200 shadow-sm">
-                <iframe src="opcionesColaborador.html" name="menu"></iframe>
-            </aside>
+    <main class="flex flex-1 overflow-hidden">
+        
+        <aside class="w-[260px] h-full bg-white border-r border-gray-200 shadow-sm">
+            <iframe src="opcionesColaborador.html" name="menu" class="w-full h-full border-none"></iframe>
+        </aside>
 
-            <section class="bg-gray-50">
-                <iframe src="dashboard.html" name="contenidoPrincipal"></iframe>
-            </section>
-        </main>
+        <section class="flex-1 h-full bg-gray-50">
+            <iframe src="dashboard.html" name="contenidoPrincipal" class="w-full h-full border-none"></iframe>
+        </section>
 
-        <footer class="bg-white border-t border-gray-200">
-            <iframe src="pieDePagina.html" name="pie"></iframe>
-        </footer>
-    </div>
+    </main>
+
+    <footer class="h-[40px] w-full bg-white border-t border-gray-200">
+        <iframe src="pieDePagina.html" name="pie" class="w-full h-full border-none"></iframe>
+    </footer>
 
 </body>
 </html>
